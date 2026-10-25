@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>BetterLab VR - Call Center Chaos (Open Office)</title>
+    <style>
+        body { margin: 0; background: #0b0f19; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        
+        #main-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(135deg, rgba(11, 15, 25, 0.96), rgba(30, 15, 40, 0.92));
+            z-index: 10; backdrop-filter: blur(12px); transition: opacity 0.5s ease;
+        }
+
+        .menu-card {
+            text-align: center; border: 2px solid #a855f7; padding: 40px 50px;
+            box-shadow: 0 10px 40px rgba(168, 85, 247, 0.25); background: rgba(15, 12, 25, 0.95);
+            border-radius: 16px; max-width: 420px; width: 90%;
+        }
+
+        h1 { font-size: 2.2rem; margin-bottom: 5px; color: #a855f7; letter-spacing: 2px; text-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+        p { color: #94a3b8; margin-bottom: 25px; font-size: 0.95rem; }
+
+        input {
+            width: 85%; padding: 12px; margin-bottom: 12px; background: #050508; border: 1px solid #334155;
+            color: #fff; font-size: 1rem; text-align: center; border-radius: 8px; outline: none;
+        }
+        input:focus { border-color: #a855f7; }
+
+        .btn {
+            display: block; width: 90%; margin: 10px auto; padding: 14px;
+            font-size: 1.1rem; font-weight: bold; color: #fff; background: #a855f7;
+            border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+            transition: all 0.2s ease;
+        }
+        .btn:hover { background: #9333ea; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5); }
+        
+        .btn-sec { background: #06b6d4; box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); }
+        .btn-sec:hover { background: #0891b2; }
+
+        .btn-solo { background: #334155; box-shadow: none; }
+        .btn-solo:hover { background: #475569; }
+
+        #hud {
+            position: absolute; top: 20px; left: 20px; z-index: 5;
+            font-size: 1.3rem; font-weight: bold; color: #a855f7; background: rgba(15, 12, 25, 0.9);
+            padding: 12px 22px; border-radius: 10px; border-left: 5px solid #a855f7;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4); pointer-events: none;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+
+    <!-- Three.js Importmap & PeerJS -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+    <div id="hud">
+        Átvert Ügyfelek: <span id="score">0</span> | Szoba ID: <span id="room-display">Solo</span>
+    </div>
+
+    <!-- FŐMENÜ -->
+    <div id="main-menu">
+        <div class="menu-card">
+            <h1>CALL CENTER CHAOS</h1>
+            <p>Vedd fel a telefont és verd át a hívót a barátoddal!</p>
+
+            <button class="btn btn-solo" id="solo-btn">1. EGYEDÜLI IRODA (SOLO)</button>
+            <hr style="border: 0.5px solid #334155; margin: 20px 0;">
+
+            <button class="btn" id="host-btn">2. SZOBA NYITÁSA (HOST)</button>
+            
+            <div style="margin-top: 15px;">
+                <input type="text" id="join-id-input" placeholder="Host Office ID beírása...">
+                <button class="btn btn-sec" id="join-btn">3. CSATLAKOZÁS IRODÁHOZ</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- 1. MULTIPLAYER HÁLÓZAT (PeerJS) ---
+        let peer = null;
+        let conn = null;
+        let remotePlayerMesh = null;
+
+        function startGame() {
+            document.getElementById('main-menu').classList.add('hidden');
+        }
+
+        function hostMultiGame() {
+            peer = new Peer();
+            peer.on('open', (id) => {
+                document.getElementById('room-display').innerText = id;
+                alert('Az Iroda Szoba ID-d: ' + id + '\nEzt küldd el a barátodnak!');
+                startGame();
+            });
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupDataConnection();
+                alert('Egy kollégád csatlakozott az irodához!');
+            });
+        }
+
+        function joinMultiGame() {
+            const hostId = document.getElementById('join-id-input').value.trim();
+            if (!hostId) return alert('Írd be a Host ID-ját!');
+
+            peer = new Peer();
+            peer.on('open', () => {
+                conn = peer.connect(hostId);
+                setupDataConnection();
+                document.getElementById('room-display').innerText = hostId;
+                alert('Sikeresen csatlakoztál a kollégádhoz!');
+                startGame();
+            });
+        }
+
+        function setupDataConnection() {
+            createRemotePlayer();
+            conn.on('data', (data) => {
+                if (data.type === 'transform' && remotePlayerMesh) {
+                    remotePlayerMesh.position.set(data.pos.x, data.pos.y, data.pos.z);
+                    remotePlayerMesh.quaternion.set(data.rot.x, data.rot.y, data.rot.z, data.rot.w);
+                } else if (data.type === 'object_throw') {
+                    spawnThrownObject(new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z), new THREE.Vector3(data.vel.x, data.vel.y, data.vel.z), false);
+                }
+            });
+        }
+
+        function sendTransformData() {
+            if (conn && conn.open) {
+                const headPos = new THREE.Vector3();
+                const headRot = new THREE.Quaternion();
+                camera.getWorldPosition(headPos);
+                camera.getWorldQuaternion(headRot);
+
+                conn.send({
+                    type: 'transform',
+                    pos: { x: headPos.x, y: headPos.y, z: headPos.z },
+                    rot: { x: headRot.x, y: headRot.y, z: headRot.z, w: headRot.w }
+                });
+            }
+        }
+
+        function createRemotePlayer() {
+            const group = new THREE.Group();
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 16, 16),
+                new THREE.MeshStandardMaterial({ color: 0x06b6d4 })
+            );
+            const headset = new THREE.Mesh(
+                new THREE.BoxGeometry(0.2, 0.08, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0xa855f7 })
+            );
+            group.add(head);
+            group.add(headset);
+            scene.add(group);
+            remotePlayerMesh = group;
+        }
+
+        // --- 2. JELENET ÉS OPEN-SPACE IRODA KÖRNYEZET ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0b0f19);
+        scene.fog = new THREE.FogExp2(0x0b0f19, 0.012);
+
+        const cameraRig = new THREE.Group();
+        cameraRig.position.set(0, 0, 4);
+        scene.add(cameraRig);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.6, 0);
+        cameraRig.add(camera);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.xr.enabled = true;
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- 3. DESKTOP EGÉR & WASD VEZÉRLÉS ---
+        const controls = new PointerLockControls(camera, renderer.domElement);
+        
+        window.addEventListener('click', () => {
+            if (!renderer.xr.isPresenting && document.getElementById('main-menu').classList.contains('hidden')) {
+                controls.lock();
+            }
+        });
+
+        const keyboard = {};
+        window.addEventListener('keydown', (e) => { keyboard[e.code] = true; });
+        window.addEventListener('keyup', (e) => { keyboard[e.code] = false; });
+
+        // --- 4. OPEN SPACE IRODA ÉPÍTÉSE (Falak, Plafon, Neonok) ---
+        scene.add(new THREE.AmbientLight(0x1e1b4b, 1.2));
+        
+        // Mennyezeti neon fények
+        [-3, 0, 3].forEach(x => {
+            const light = new THREE.PointLight(0xa855f7, 1.5, 12);
+            light.position.set(x, 3.8, 0);
+            scene.add(light);
+        });
+
+        // Hatalmas irodai padló
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(30, 30),
+            new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Iroda falak
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(30, 5, 0.5), wallMat);
+        backWall.position.set(0, 2.5, -10);
+        scene.add(backWall);
+
+        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5, 30), wallMat);
+        leftWall.position.set(-10, 2.5, 0);
+        scene.add(leftWall);
+
+        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5, 30), wallMat);
+        rightWall.position.set(10, 2.5, 0);
+        scene.add(rightWall);
+
+        // --- 5. 4-5 MODERN SETUP LÉTREHOZÁSA AZ IRODÁBAN ---
+        function createDeskSetup(x, z, rotationY) {
+            const setupGroup = new THREE.Group();
+
+            // Asztal
+            const deskTop = new THREE.Mesh(
+                new THREE.BoxGeometry(1.8, 0.1, 0.9),
+                new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
+            );
+            deskTop.castShadow = true;
+            deskTop.receiveShadow = true;
+            setupGroup.add(deskTop);
+
+            // Asztal lábak
+            [[-0.8, -0.35], [0.8, -0.35], [-0.8, 0.35], [0.8, 0.35]].forEach(([lx, lz]) => {
+                const leg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.03, 0.03, 0.8),
+                    new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+                );
+                leg.position.set(lx, 0.4, lz);
+                setupGroup.add(leg);
+            });
+
+            // Monitor
+            const monitor = new THREE.Mesh(
+                new THREE.BoxGeometry(0.65, 0.45, 0.06),
+                new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.4 })
+            );
+            monitor.position.set(0, 1.15, -0.25);
+            setupGroup.add(monitor);
+
+            // Billentyűzet & Egér pad
+            const keyboard = new THREE.Mesh(
+                new THREE.BoxGeometry(0.4, 0.02, 0.15),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            keyboard.position.set(0, 0.86, 0.1);
+            setupGroup.add(keyboard);
+
+            // Irodai szék
+            const chairBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.25, 0.25, 0.05),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            chairBase.position.set(0, 0.25, 0.5);
+            setupGroup.add(chairBase);
+
+            const chairBack = new THREE.Mesh(
+                new THREE.BoxGeometry(0.45, 0.5, 0.08),
+                new THREE.MeshStandardMaterial({ color: 0x475569 })
+            );
+            chairBack.position.set(0, 0.6, 0.7);
+            setupGroup.add(chairBack);
+
+            setupGroup.position.set(x, 0, z);
+            setupGroup.rotation.y = rotationY;
+            scene.add(setupGroup);
+        }
+
+        // 5 különböző setup elhelyezése az open-space irodában
+        createDeskSetup(0, -3.5, 0);       // Középső fő setup
+        createDeskSetup(-4.5, -3.5, 0);    // Bal oldali setup
+        createDeskSetup(4.5, -3.5, 0);     // Jobb oldali setup
+        createDeskSetup(-4.5, 1.5, Math.PI); // Hátsó bal setup (szembe néz)
+        createDeskSetup(4.5, 1.5, Math.PI);  // Hátsó jobb setup (szembe néz)
+
+        // --- 6. TÁRGYDOBÁLÁS (Kávéscsészék) ---
+        const thrownObjects = [];
+        const mugGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.12, 16);
+        const mugMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+
+        function spawnThrownObject(pos, vel, sendNetwork = true) {
+            const obj = new THREE.Mesh(mugGeo, mugMat);
+            obj.position.copy(pos);
+            obj.userData = { velocity: vel, life: 3.0 };
+            scene.add(obj);
+            thrownObjects.push(obj);
+
+            if (sendNetwork && conn && conn.open) {
+                conn.send({
+                    type: 'object_throw',
+                    pos: { x: pos.x, y: pos.y, z: pos.z },
+                    vel: { x: vel.x, y: vel.y, z: vel.z }
+                });
+            }
+        }
+
+        let scamCount = 0;
+        window.addEventListener('mousedown', () => {
+            if (!renderer.xr.isPresenting && controls.isLocked) {
+                const pos = new THREE.Vector3();
+                const dir = new THREE.Vector3();
+                camera.getWorldPosition(pos);
+                camera.getWorldDirection(dir);
+
+                spawnThrownObject(pos, dir.multiplyScalar(15), true);
+                scamCount++;
+                document.getElementById('score').innerText = scamCount;
+            }
+        });
+
+        // --- 7. VR KONTROLLEREK ÉS MOZGÁS ---
+        function onSelectStart(event) {
+            const controller = event.target;
+            const pos = new THREE.Vector3();
+            const dir = new THREE.Vector3();
+            controller.getWorldPosition(pos);
+            controller.getWorldDirection(dir);
+            dir.negate();
+
+            spawnThrownObject(pos, dir.multiplyScalar(15).add(new THREE.Vector3(0, 3, 0)), true);
+            scamCount++;
+            document.getElementById('score').innerText = scamCount;
+        }
+
+        const controller1 = renderer.xr.getController(0);
+        controller1.addEventListener('selectstart', onSelectStart);
+        cameraRig.add(controller1);
+
+        const controller2 = renderer.xr.getController(1);
+        controller2.addEventListener('selectstart', onSelectStart);
+        cameraRig.add(controller2);
+
+        function updateDesktopMovement(delta) {
+            if (renderer.xr.isPresenting) return;
+            const speed = 4.0 * delta;
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            dir.y = 0;
+            dir.normalize();
+
+            const sideDir = new THREE.Vector3(-dir.z, 0, dir.x);
+
+            if (keyboard['KeyW']) cameraRig.position.addScaledVector(dir, speed);
+            if (keyboard['KeyS']) cameraRig.position.addScaledVector(dir, -speed);
+            if (keyboard['KeyA']) cameraRig.position.addScaledVector(sideDir, speed);
+            if (keyboard['KeyD']) cameraRig.position.addScaledVector(sideDir, -speed);
+        }
+
+        function updateVRLocomotion(delta) {
+            const session = renderer.xr.getSession();
+            if (!session) return;
+
+            for (const inputSource of session.inputSources) {
+                if (inputSource && inputSource.handedness === 'left' && inputSource.gamepad) {
+                    const axes = inputSource.gamepad.axes;
+                    const xAxis = axes[2] || axes[0] || 0;
+                    const yAxis = axes[3] || axes[1] || 0;
+
+                    if (Math.abs(xAxis) > 0.1 || Math.abs(yAxis) > 0.1) {
+                        const moveSpeed = 2.2 * delta;
+                        const headRotation = new THREE.Euler(0, 0, 0, 'YXZ');
+                        headRotation.setFromQuaternion(camera.quaternion);
+
+                        const moveVector = new THREE.Vector3(xAxis, 0, yAxis);
+                        moveVector.applyEuler(new THREE.Euler(0, headRotation.y, 0));
+                        moveVector.multiplyScalar(moveSpeed);
+
+                        cameraRig.position.add(moveVector);
+                    }
+                }
+            }
+        }
+
+        // --- 8. MENÜ & VR GOMB ---
+        document.getElementById('solo-btn').addEventListener('click', startGame);
+        document.getElementById('host-btn').addEventListener('click', hostMultiGame);
+        document.getElementById('join-btn').addEventListener('click', joinMultiGame);
+
+        const vrButton = VRButton.createButton(renderer, {
+            requiredFeatures: ['hit-test'],
+            domOverlay: { root: document.getElementById('main-menu') }
+        });
+        document.body.appendChild(vrButton);
+
+        // --- 9. RENDER LOOP ---
+        const clock = new THREE.Clock();
+
+        renderer.setAnimationLoop(() => {
+            const delta = clock.getDelta();
+
+            updateDesktopMovement(delta);
+            updateVRLocomotion(delta);
+            sendTransformData();
+
+            for (let i = thrownObjects.length - 1; i >= 0; i--) {
+                const obj = thrownObjects[i];
+                obj.position.addScaledVector(obj.userData.velocity, delta);
+                obj.userData.velocity.y -= 9.8 * delta;
+                obj.userData.life -= delta;
+
+                if (obj.position.y <= 0.05) {
+                    obj.position.y = 0.05;
+                    obj.userData.velocity.set(0, 0, 0);
+                }
+
+                if (obj.userData.life <= 0) {
+                    scene.remove(obj);
+                    thrownObjects.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
