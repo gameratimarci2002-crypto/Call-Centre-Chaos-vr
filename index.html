@@ -1,452 +1,849 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>BetterLab VR - Call Center Chaos (Open Office)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call Centre Chaos VR</title>
+    <!-- Tailwind CSS for Desktop UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; background: #0b0f19; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
-        
-        #main-menu {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: linear-gradient(135deg, rgba(11, 15, 25, 0.96), rgba(30, 15, 40, 0.92));
-            z-index: 10; backdrop-filter: blur(12px); transition: opacity 0.5s ease;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #030308;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
         }
-
-        .menu-card {
-            text-align: center; border: 2px solid #a855f7; padding: 40px 50px;
-            box-shadow: 0 10px 40px rgba(168, 85, 247, 0.25); background: rgba(15, 12, 25, 0.95);
-            border-radius: 16px; max-width: 420px; width: 90%;
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
         }
-
-        h1 { font-size: 2.2rem; margin-bottom: 5px; color: #a855f7; letter-spacing: 2px; text-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
-        p { color: #94a3b8; margin-bottom: 25px; font-size: 0.95rem; }
-
-        input {
-            width: 85%; padding: 12px; margin-bottom: 12px; background: #050508; border: 1px solid #334155;
-            color: #fff; font-size: 1rem; text-align: center; border-radius: 8px; outline: none;
+        .cyber-border {
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
         }
-        input:focus { border-color: #a855f7; }
-
-        .btn {
-            display: block; width: 90%; margin: 10px auto; padding: 14px;
-            font-size: 1.1rem; font-weight: bold; color: #fff; background: #a855f7;
-            border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
-            transition: all 0.2s ease;
+        .cyber-glow {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(255, 0, 128, 0.6);
         }
-        .btn:hover { background: #9333ea; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5); }
-        
-        .btn-sec { background: #06b6d4; box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); }
-        .btn-sec:hover { background: #0891b2; }
-
-        .btn-solo { background: #334155; box-shadow: none; }
-        .btn-solo:hover { background: #475569; }
-
-        #hud {
-            position: absolute; top: 20px; left: 20px; z-index: 5;
-            font-size: 1.3rem; font-weight: bold; color: #a855f7; background: rgba(15, 12, 25, 0.9);
-            padding: 12px 22px; border-radius: 10px; border-left: 5px solid #a855f7;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4); pointer-events: none;
-        }
-
-        .hidden { display: none !important; }
     </style>
-
-    <!-- Three.js Importmap & PeerJS -->
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
-      }
-    </script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Three.js & WebXR VR Button -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/VRButton.js"></script>
 </head>
 <body>
+    <div id="canvas-container"></div>
 
-    <div id="hud">
-        Átvert Ügyfelek: <span id="score">0</span> | Szoba ID: <span id="room-display">Solo</span>
-    </div>
-
-    <!-- FŐMENÜ -->
-    <div id="main-menu">
-        <div class="menu-card">
-            <h1>CALL CENTER CHAOS</h1>
-            <p>Vedd fel a telefont és verd át a hívót a barátoddal!</p>
-
-            <button class="btn btn-solo" id="solo-btn">1. EGYEDÜLI IRODA (SOLO)</button>
-            <hr style="border: 0.5px solid #334155; margin: 20px 0;">
-
-            <button class="btn" id="host-btn">2. SZOBA NYITÁSA (HOST)</button>
-            
-            <div style="margin-top: 15px;">
-                <input type="text" id="join-id-input" placeholder="Host Office ID beírása...">
-                <button class="btn btn-sec" id="join-btn">3. CSATLAKOZÁS IRODÁHOZ</button>
-            </div>
+    <!-- Desktop Fallback Controls & Start Screen Overlay -->
+    <div id="desktop-overlay" class="absolute top-4 left-4 z-10 p-5 rounded-2xl bg-slate-950/85 backdrop-blur-md cyber-border text-cyan-300 max-w-sm pointer-events-auto transition-all duration-300">
+        <h1 class="text-2xl font-black tracking-wider text-pink-500 cyber-glow mb-1">CALL CENTRE CHAOS VR</h1>
+        <p class="text-xs text-slate-400 mb-3 font-mono">NEO-TOKYO SUPPORT SECTOR #404</p>
+        
+        <div id="desktop-instructions" class="text-xs space-y-1.5 text-slate-300 border-t border-slate-800 pt-3 mb-4">
+            <p><span class="text-cyan-400 font-bold">VR MODE:</span> Put on headset, click <span class="text-pink-400 font-bold">ENTER VR</span>, pull trigger to aim/shoot solution buttons.</p>
+            <p><span class="text-cyan-400 font-bold">DESKTOP MODE:</span> Click screen to lock mouse. Aim reticle & left-click to shoot nodes/buttons. Use <span class="text-pink-400 font-bold">WASD</span> to adjust desk position.</p>
+            <p class="text-yellow-400 font-semibold pt-1">💡 Tip: Sip coffee on your left desk to reduce stress!</p>
         </div>
+
+        <button id="start-btn" onclick="startGame()" class="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-pink-600 hover:from-cyan-400 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95">
+            START SHIFT (DESKTOP)
+        </button>
     </div>
 
-    <script type="module">
-        import * as THREE from 'three';
-        import { VRButton } from 'three/addons/webxr/VRButton.js';
-        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+    <!-- Main Game Engine -->
+    <script>
+        // --- Web Audio Synthesizer Engine ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.humOsc = null;
+            }
 
-        // --- 1. MULTIPLAYER HÁLÓZAT (PeerJS) ---
-        let peer = null;
-        let conn = null;
-        let remotePlayerMesh = null;
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                    this.startOfficeHum();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
 
-        function startGame() {
-            document.getElementById('main-menu').classList.add('hidden');
+            startOfficeHum() {
+                if (!this.ctx) return;
+                // Low pitch ambient server room hum
+                this.humOsc = this.ctx.createOscillator();
+                const humGain = this.ctx.createGain();
+                this.humOsc.type = 'sawtooth';
+                this.humOsc.frequency.setValueAtTime(55, this.ctx.currentTime);
+                humGain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(180, this.ctx.currentTime);
+
+                this.humOsc.connect(filter);
+                filter.connect(humGain);
+                humGain.connect(this.ctx.destination);
+                this.humOsc.start();
+            }
+
+            playLaser() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(900, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playRing() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(700, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(900, this.ctx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.18);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.18);
+            }
+
+            playSuccess() {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.05);
+                    osc.stop(now + idx * 0.05 + 0.2);
+                });
+            }
+
+            playFail() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(60, this.ctx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.35);
+            }
+
+            playCoffee() {
+                if (!this.ctx) return;
+                // Slurp / gulp pitch glissando
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
         }
 
-        function hostMultiGame() {
-            peer = new Peer();
-            peer.on('open', (id) => {
-                document.getElementById('room-display').innerText = id;
-                alert('Az Iroda Szoba ID-d: ' + id + '\nEzt küldd el a barátodnak!');
-                startGame();
-            });
-            peer.on('connection', (connection) => {
-                conn = connection;
-                setupDataConnection();
-                alert('Egy kollégád csatlakozott az irodához!');
-            });
-        }
+        const audio = new SoundEngine();
 
-        function joinMultiGame() {
-            const hostId = document.getElementById('join-id-input').value.trim();
-            if (!hostId) return alert('Írd be a Host ID-ját!');
+        // --- Game Logic Configurations & Constants ---
+        const CALL_TYPES = {
+            VIP: { name: 'ANGRY VIP', color: 0xff0055, bgHex: '#ff0055', solution: 'TRANSFER', time: 10, points: 250, desc: 'TRANSFER CALL IMMEDIATELY!' },
+            TECH: { name: 'TECHNOBABBLE', color: 0x00f0ff, bgHex: '#00f0ff', solution: 'REBOOT SYSTEM', time: 14, points: 150, desc: 'ROUTER BROKEN? REBOOT IT!' },
+            SPAM: { name: 'SPAM ROBOCALL', color: 0xffaa00, bgHex: '#ffaa00', solution: 'BLOCK & MUTE', time: 8, points: 100, desc: 'JUNK CALL! MUTE QUICKLY!' },
+            BOSS: { name: 'BOSS CHECK', color: 0xaa00ff, bgHex: '#aa00ff', solution: 'FAKE TYPING', time: 7, points: 300, desc: 'LOOK BUSY! TYPE HARD!' }
+        };
 
-            peer = new Peer();
-            peer.on('open', () => {
-                conn = peer.connect(hostId);
-                setupDataConnection();
-                document.getElementById('room-display').innerText = hostId;
-                alert('Sikeresen csatlakoztál a kollégádhoz!');
-                startGame();
+        const SOLUTIONS = ['TRANSFER', 'REBOOT SYSTEM', 'BLOCK & MUTE', 'FAKE TYPING'];
+
+        // --- Core Variables ---
+        let scene, camera, renderer;
+        let controllers = [], controllerGrips = [];
+        let raycaster, tempMatrix;
+        
+        // Game Metrics
+        let gameState = 'IDLE'; // 'IDLE', 'PLAYING', 'GAMEOVER'
+        let score = 0;
+        let highScore = localStorage.getItem('ccc_vr_highscore') || 0;
+        let answeredCount = 0;
+        let stressLevel = 0; // 0 to 100
+        let satisfaction = 100; // 0 to 100
+        let combo = 1;
+        let spawnTimer = 0;
+        let nextSpawnInterval = 3.0; // Seconds
+
+        // Game Objects
+        let activeCalls = [];
+        let particles = [];
+        let deskGroup;
+        let HUDMesh, HUDCanvas, HUDContext, HUDTexture;
+        let coffeeMugMesh;
+
+        // Desktop Pointer Controls
+        let isPointerLocked = false;
+        let desktopReticle;
+        const moveKeys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+        const cameraEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+        // Color Palette
+        const NEON_CYAN = 0x00f0ff;
+        const NEON_PINK = 0xff007f;
+        const NEON_YELLOW = 0xffd700;
+
+        window.addEventListener('load', init);
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x03030c);
+            scene.fog = new THREE.FogExp2(0x03030c, 0.04);
+
+            // 2. Camera Setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.4, 0.2); // Seated height at desk
+
+            // 3. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Add VR Button
+            document.body.appendChild(VRButton.createButton(renderer));
+
+            // 4. Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambient);
+
+            const deskLight = new THREE.PointLight(NEON_CYAN, 1.8, 8);
+            deskLight.position.set(0, 2.2, -0.8);
+            scene.add(deskLight);
+
+            const sideLight = new THREE.PointLight(NEON_PINK, 1.2, 10);
+            sideLight.position.set(-2, 2, -1);
+            scene.add(sideLight);
+
+            // 5. Build Environment & Cubicle
+            buildCyberCubicle();
+
+            // 6. Raycaster & VR Controller Setup
+            raycaster = new THREE.Raycaster();
+            tempMatrix = new THREE.Matrix4();
+            setupVRControllers();
+
+            // Desktop Reticle
+            const reticleGeo = new THREE.RingGeometry(0.008, 0.012, 32);
+            const reticleMat = new THREE.MeshBasicMaterial({ color: NEON_CYAN, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            desktopReticle = new THREE.Mesh(reticleGeo, reticleMat);
+            desktopReticle.position.z = -0.8;
+            camera.add(desktopReticle);
+            scene.add(camera);
+
+            // 7. Create 3D Floating HUD
+            createSpatialHUD();
+
+            // 8. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', (e) => { if (moveKeys.hasOwnProperty(e.code)) moveKeys[e.code] = true; });
+            document.addEventListener('keyup', (e) => { if (moveKeys.hasOwnProperty(e.code)) moveKeys[e.code] = false; });
+            
+            renderer.domElement.addEventListener('click', () => {
+                audio.init();
+                if (!renderer.xr.isPresenting && gameState === 'PLAYING') {
+                    renderer.domElement.requestPointerLock();
+                }
+                onPrimaryAction(camera);
             });
-        }
 
-        function setupDataConnection() {
-            createRemotePlayer();
-            conn.on('data', (data) => {
-                if (data.type === 'transform' && remotePlayerMesh) {
-                    remotePlayerMesh.position.set(data.pos.x, data.pos.y, data.pos.z);
-                    remotePlayerMesh.quaternion.set(data.rot.x, data.rot.y, data.rot.z, data.rot.w);
-                } else if (data.type === 'object_throw') {
-                    spawnThrownObject(new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z), new THREE.Vector3(data.vel.x, data.vel.y, data.vel.z), false);
+            document.addEventListener('pointerlockchange', () => {
+                isPointerLocked = document.pointerLockElement === renderer.domElement;
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isPointerLocked && !renderer.xr.isPresenting) {
+                    cameraEuler.setFromQuaternion(camera.quaternion);
+                    cameraEuler.y -= e.movementX * 0.0022;
+                    cameraEuler.x -= e.movementY * 0.0022;
+                    cameraEuler.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, cameraEuler.x));
+                    camera.quaternion.setFromEuler(cameraEuler);
                 }
             });
+
+            // Start Main Animation Loop
+            renderer.setAnimationLoop(animate);
         }
 
-        function sendTransformData() {
-            if (conn && conn.open) {
-                const headPos = new THREE.Vector3();
-                const headRot = new THREE.Quaternion();
-                camera.getWorldPosition(headPos);
-                camera.getWorldQuaternion(headRot);
+        // --- Build Cubicle Workspace ---
+        function buildEnvironment() {
+            // Deprecated direct call (moved to buildCyberCubicle)
+        }
 
-                conn.send({
-                    type: 'transform',
-                    pos: { x: headPos.x, y: headPos.y, z: headPos.z },
-                    rot: { x: headRot.x, y: headRot.y, z: headRot.z, w: headRot.w }
+        function buildCyberCubicle() {
+            deskGroup = new THREE.Group();
+
+            // Metallic Desk Surface
+            const deskGeo = new THREE.BoxGeometry(2.4, 0.08, 1.2);
+            const deskMat = new THREE.MeshStandardMaterial({ color: 0x12131e, roughness: 0.3, metalness: 0.8 });
+            const desk = new THREE.Mesh(deskGeo, deskMat);
+            desk.position.set(0, 0.8, -0.7);
+            desk.receiveShadow = true;
+            deskGroup.add(desk);
+
+            // Glowing Edge Strip on Desk
+            const stripGeo = new THREE.BoxGeometry(2.42, 0.02, 0.02);
+            const stripMat = new THREE.MeshBasicMaterial({ color: NEON_CYAN });
+            const strip = new THREE.Mesh(stripGeo, stripMat);
+            strip.position.set(0, 0.82, -0.11);
+            deskGroup.add(strip);
+
+            // Cubicle Walls
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x090a14, roughness: 0.6 });
+            
+            // Back Wall
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.5, 0.1), wallMat);
+            backWall.position.set(0, 1.25, -1.3);
+            deskGroup.add(backWall);
+
+            // Side Partition Walls
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 2.2), wallMat);
+            leftWall.position.set(-1.6, 1.25, -0.2);
+            deskGroup.add(leftWall);
+
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.5, 2.2), wallMat);
+            rightWall.position.set(1.6, 1.25, -0.2);
+            deskGroup.add(rightWall);
+
+            // Interactive Coffee Mug (Stress Relief)
+            const mugGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.12, 16);
+            const mugMat = new THREE.MeshStandardMaterial({ color: NEON_PINK, roughness: 0.2 });
+            coffeeMugMesh = new THREE.Mesh(mugGeo, mugMat);
+            coffeeMugMesh.position.set(-0.8, 0.9, -0.5);
+            coffeeMugMesh.name = 'coffee_mug';
+            deskGroup.add(coffeeMugMesh);
+
+            // Coffee Hologram Label
+            const labelGeo = new THREE.PlaneGeometry(0.2, 0.08);
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 128; labelCanvas.height = 64;
+            const lctx = labelCanvas.getContext('2d');
+            lctx.fillStyle = '#ff007f'; lctx.fillRect(0,0,128,64);
+            lctx.fillStyle = '#ffffff'; lctx.font = 'bold 20px sans-serif';
+            lctx.textAlign = 'center'; lctx.fillText('STRESS RELIEF', 64, 40);
+            const labelTex = new THREE.CanvasTexture(labelCanvas);
+            const labelMesh = new THREE.Mesh(labelGeo, new THREE.MeshBasicMaterial({ map: labelTex, side: THREE.DoubleSide }));
+            labelMesh.position.set(-0.8, 1.02, -0.5);
+            deskGroup.add(labelMesh);
+
+            // Keyboard Prop
+            const kbGeo = new THREE.BoxGeometry(0.5, 0.02, 0.18);
+            const kbMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.5 });
+            const kb = new THREE.Mesh(kbGeo, kbMat);
+            kb.position.set(0, 0.85, -0.5);
+            deskGroup.add(kb);
+
+            // Office Grid Floor
+            const floorGrid = new THREE.GridHelper(40, 40, NEON_PINK, 0x1a1a3a);
+            floorGrid.position.y = 0;
+            scene.add(floorGrid);
+
+            scene.add(deskGroup);
+        }
+
+        // --- VR Controller Setup ---
+        function setupVRControllers() {
+            for (let i = 0; i < 2; i++) {
+                const controller = renderer.xr.getController(i);
+                
+                controller.addEventListener('selectstart', () => {
+                    audio.init();
+                    onPrimaryAction(controller);
                 });
+
+                scene.add(controller);
+                controllers.push(controller);
+
+                // Beam Ray Visual
+                const laserGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(0, 0, -6)
+                ]);
+                const laserMat = new THREE.LineBasicMaterial({ color: NEON_CYAN, transparent: true, opacity: 0.8 });
+                const laser = new THREE.Line(laserGeo, laserMat);
+                controller.add(laser);
+
+                // Controller Wand Visual
+                const grip = renderer.xr.getControllerGrip(i);
+                const wandGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.18, 16);
+                wandGeo.rotateX(-Math.PI / 2);
+                const wandMat = new THREE.MeshStandardMaterial({ color: 0x222238, emissive: NEON_CYAN, emissiveIntensity: 0.2 });
+                grip.add(new THREE.Mesh(wandGeo, wandMat));
+                scene.add(grip);
+                controllerGrips.push(grip);
             }
         }
 
-        function createRemotePlayer() {
-            const group = new THREE.Group();
-            const head = new THREE.Mesh(
-                new THREE.SphereGeometry(0.12, 16, 16),
-                new THREE.MeshStandardMaterial({ color: 0x06b6d4 })
-            );
-            const headset = new THREE.Mesh(
-                new THREE.BoxGeometry(0.2, 0.08, 0.1),
-                new THREE.MeshStandardMaterial({ color: 0xa855f7 })
-            );
-            group.add(head);
-            group.add(headset);
-            scene.add(group);
-            remotePlayerMesh = group;
+        // --- 3D Spatial Canvas HUD ---
+        function createSpatialHUD() {
+            HUDCanvas = document.createElement('canvas');
+            HUDCanvas.width = 512;
+            HUDCanvas.height = 256;
+            HUDContext = HUDCanvas.getContext('2d');
+
+            HUDTexture = new THREE.CanvasTexture(HUDCanvas);
+            const hudGeo = new THREE.PlaneGeometry(1.2, 0.6);
+            const hudMat = new THREE.MeshBasicMaterial({ map: HUDTexture, transparent: true, side: THREE.DoubleSide });
+            
+            HUDMesh = new THREE.Mesh(hudGeo, hudMat);
+            HUDMesh.position.set(0, 1.65, -1.25); // Mounted on cubicle back wall
+            scene.add(HUDMesh);
+
+            updateHUD();
         }
 
-        // --- 2. JELENET ÉS OPEN-SPACE IRODA KÖRNYEZET ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0b0f19);
-        scene.fog = new THREE.FogExp2(0x0b0f19, 0.012);
+        function updateHUD() {
+            if (!HUDContext) return;
+            const ctx = HUDContext;
+            ctx.clearRect(0, 0, 512, 256);
 
-        const cameraRig = new THREE.Group();
-        cameraRig.position.set(0, 0, 4);
-        scene.add(cameraRig);
+            // Sci-fi Box Frame
+            ctx.fillStyle = 'rgba(8, 12, 24, 0.9)';
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.roundRect(10, 10, 492, 236, 16);
+            ctx.fill();
+            ctx.stroke();
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 0);
-        cameraRig.add(camera);
+            ctx.textAlign = 'center';
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true;
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
+            if (gameState === 'IDLE') {
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = 'bold 34px sans-serif';
+                ctx.fillText('CALL CENTRE CHAOS', 256, 70);
 
-        // --- 3. DESKTOP EGÉR & WASD VEZÉRLÉS ---
-        const controls = new PointerLockControls(camera, renderer.domElement);
-        
-        window.addEventListener('click', () => {
-            if (!renderer.xr.isPresenting && document.getElementById('main-menu').classList.contains('hidden')) {
-                controls.lock();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('Shift Status: READY', 256, 115);
+
+                ctx.fillStyle = '#ff007f';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText('SHOOT / CLICK TO START SHIFT', 256, 180);
+
+            } else if (gameState === 'PLAYING') {
+                // Score & Combo
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = 'bold 28px sans-serif';
+                ctx.fillText(`SCORE: ${score}`, 140, 55);
+
+                ctx.fillStyle = combo > 1 ? '#ffd700' : '#8899ac';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.fillText(`COMBO x${combo}`, 370, 55);
+
+                // Stress Bar
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '16px sans-serif';
+                ctx.fillText('STRESS LEVEL', 120, 105);
+
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(30, 115, 180, 20);
+                ctx.fillStyle = stressLevel > 70 ? '#ff0055' : '#00f0ff';
+                ctx.fillRect(30, 115, Math.min(180, (stressLevel / 100) * 180), 20);
+
+                // Satisfaction Bar
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('SATISFACTION', 370, 105);
+
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(280, 115, 180, 20);
+                ctx.fillStyle = satisfaction < 30 ? '#ff0055' : '#00ffaa';
+                ctx.fillRect(280, 115, Math.max(0, (satisfaction / 100) * 180), 20);
+
+                // Calls Handled
+                ctx.fillStyle = '#8899ac';
+                ctx.font = '18px sans-serif';
+                ctx.fillText(`Calls Answered: ${answeredCount}  |  High Score: ${highScore}`, 256, 185);
+
+            } else if (gameState === 'GAMEOVER') {
+                ctx.fillStyle = '#ff0055';
+                ctx.font = 'bold 36px sans-serif';
+                ctx.fillText('SHIFT TERMINATED!', 256, 65);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 26px sans-serif';
+                ctx.fillText(`FINAL SCORE: ${score}`, 256, 115);
+
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = '20px sans-serif';
+                ctx.fillText(`Calls Resolved: ${answeredCount}`, 256, 155);
+
+                ctx.fillStyle = '#ff007f';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText('SHOOT TO RESTART SHIFT', 256, 205);
             }
-        });
 
-        const keyboard = {};
-        window.addEventListener('keydown', (e) => { keyboard[e.code] = true; });
-        window.addEventListener('keyup', (e) => { keyboard[e.code] = false; });
+            HUDTexture.needsUpdate = true;
+        }
 
-        // --- 4. OPEN SPACE IRODA ÉPÍTÉSE (Falak, Plafon, Neonok) ---
-        scene.add(new THREE.AmbientLight(0x1e1b4b, 1.2));
-        
-        // Mennyezeti neon fények
-        [-3, 0, 3].forEach(x => {
-            const light = new THREE.PointLight(0xa855f7, 1.5, 12);
-            light.position.set(x, 3.8, 0);
-            scene.add(light);
-        });
+        // --- Call Node Spawning Engine ---
+        function spawnCallNode() {
+            if (activeCalls.length >= 5) return; // Cap maximum simultaneous floating calls
 
-        // Hatalmas irodai padló
-        const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(30, 30),
-            new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.8 })
-        );
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
+            // Choose random Call Type
+            const keys = Object.keys(CALL_TYPES);
+            const typeKey = keys[Math.floor(Math.random() * keys.length)];
+            const typeData = CALL_TYPES[typeKey];
 
-        // Iroda falak
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
-        const backWall = new THREE.Mesh(new THREE.BoxGeometry(30, 5, 0.5), wallMat);
-        backWall.position.set(0, 2.5, -10);
-        scene.add(backWall);
+            const nodeGroup = new THREE.Group();
 
-        const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5, 30), wallMat);
-        leftWall.position.set(-10, 2.5, 0);
-        scene.add(leftWall);
+            // Floating Terminal Frame
+            const frameGeo = new THREE.BoxGeometry(0.48, 0.38, 0.05);
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x101428, roughness: 0.3, metalness: 0.8 });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            nodeGroup.add(frame);
 
-        const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5, 30), wallMat);
-        rightWall.position.set(10, 2.5, 0);
-        scene.add(rightWall);
+            // Screen Canvas Display
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 192;
+            const ctx = canvas.getContext('2d');
 
-        // --- 5. 4-5 MODERN SETUP LÉTREHOZÁSA AZ IRODÁBAN ---
-        function createDeskSetup(x, z, rotationY) {
-            const setupGroup = new THREE.Group();
+            ctx.fillStyle = '#0a0e1a'; ctx.fillRect(0, 0, 256, 192);
+            ctx.strokeStyle = typeData.bgHex; ctx.lineWidth = 6; ctx.strokeRect(4, 4, 248, 184);
 
-            // Asztal
-            const deskTop = new THREE.Mesh(
-                new THREE.BoxGeometry(1.8, 0.1, 0.9),
-                new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 })
-            );
-            deskTop.castShadow = true;
-            deskTop.receiveShadow = true;
-            setupGroup.add(deskTop);
+            ctx.fillStyle = typeData.bgHex; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(typeData.name, 128, 35);
 
-            // Asztal lábak
-            [[-0.8, -0.35], [0.8, -0.35], [-0.8, 0.35], [0.8, 0.35]].forEach(([lx, lz]) => {
-                const leg = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.03, 0.03, 0.8),
-                    new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+            ctx.fillStyle = '#ffffff'; ctx.font = '14px sans-serif';
+            ctx.fillText(typeData.desc, 128, 75);
+
+            const screenTexture = new THREE.CanvasTexture(canvas);
+            const screenMat = new THREE.MeshBasicMaterial({ map: screenTexture });
+            const screenMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.34), screenMat);
+            screenMesh.position.z = 0.028;
+            nodeGroup.add(screenMesh);
+
+            // Solution Response Buttons Below Terminal
+            SOLUTIONS.forEach((solText, idx) => {
+                const btnCanvas = document.createElement('canvas');
+                btnCanvas.width = 128; btnCanvas.height = 48;
+                const bctx = btnCanvas.getContext('2d');
+                
+                bctx.fillStyle = solText === typeData.solution ? '#112233' : '#1a1a26';
+                bctx.fillRect(0, 0, 128, 48);
+                bctx.strokeStyle = '#00f0ff'; bctx.lineWidth = 4; bctx.strokeRect(2, 2, 124, 44);
+
+                bctx.fillStyle = '#ffffff'; bctx.font = 'bold 12px sans-serif'; bctx.textAlign = 'center';
+                bctx.fillText(solText, 64, 28);
+
+                const btnTex = new THREE.CanvasTexture(btnCanvas);
+                const btnMesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(0.2, 0.07),
+                    new THREE.MeshBasicMaterial({ map: btnTex, side: THREE.DoubleSide })
                 );
-                leg.position.set(lx, 0.4, lz);
-                setupGroup.add(leg);
+
+                // Grid position 2x2 buttons
+                const col = idx % 2;
+                const row = Math.floor(idx / 2);
+                btnMesh.position.set(-0.11 + col * 0.22, -0.26 - row * 0.08, 0.02);
+                btnMesh.name = 'solution_btn';
+                btnMesh.userData = { solution: solText, parentCall: nodeGroup };
+                nodeGroup.add(btnMesh);
             });
 
-            // Monitor
-            const monitor = new THREE.Mesh(
-                new THREE.BoxGeometry(0.65, 0.45, 0.06),
-                new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.4 })
-            );
-            monitor.position.set(0, 1.15, -0.25);
-            setupGroup.add(monitor);
+            // Random position around desk workspace
+            const spawnPosX = (Math.random() - 0.5) * 1.8;
+            const spawnPosY = 1.1 + Math.random() * 0.5;
+            const spawnPosZ = -0.4 - Math.random() * 0.5;
 
-            // Billentyűzet & Egér pad
-            const keyboard = new THREE.Mesh(
-                new THREE.BoxGeometry(0.4, 0.02, 0.15),
-                new THREE.MeshStandardMaterial({ color: 0x0f172a })
-            );
-            keyboard.position.set(0, 0.86, 0.1);
-            setupGroup.add(keyboard);
+            nodeGroup.position.set(spawnPosX, spawnPosY, spawnPosZ);
+            nodeGroup.rotation.y = (Math.random() - 0.5) * 0.4;
 
-            // Irodai szék
-            const chairBase = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.25, 0.25, 0.05),
-                new THREE.MeshStandardMaterial({ color: 0x0f172a })
-            );
-            chairBase.position.set(0, 0.25, 0.5);
-            setupGroup.add(chairBase);
+            scene.add(nodeGroup);
 
-            const chairBack = new THREE.Mesh(
-                new THREE.BoxGeometry(0.45, 0.5, 0.08),
-                new THREE.MeshStandardMaterial({ color: 0x475569 })
-            );
-            chairBack.position.set(0, 0.6, 0.7);
-            setupGroup.add(chairBack);
+            const callObj = {
+                meshGroup: nodeGroup,
+                type: typeData,
+                timeLeft: typeData.time,
+                maxTime: typeData.time,
+                bobPhase: Math.random() * Math.PI * 2
+            };
 
-            setupGroup.position.set(x, 0, z);
-            setupGroup.rotation.y = rotationY;
-            scene.add(setupGroup);
+            activeCalls.push(callObj);
+            audio.playRing();
         }
 
-        // 5 különböző setup elhelyezése az open-space irodában
-        createDeskSetup(0, -3.5, 0);       // Középső fő setup
-        createDeskSetup(-4.5, -3.5, 0);    // Bal oldali setup
-        createDeskSetup(4.5, -3.5, 0);     // Jobb oldali setup
-        createDeskSetup(-4.5, 1.5, Math.PI); // Hátsó bal setup (szembe néz)
-        createDeskSetup(4.5, 1.5, Math.PI);  // Hátsó jobb setup (szembe néz)
+        // --- Interactive Shot / Click Handler ---
+        function onPrimaryAction(sourceObject) {
+            audio.playLaser();
 
-        // --- 6. TÁRGYDOBÁLÁS (Kávéscsészék) ---
-        const thrownObjects = [];
-        const mugGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.12, 16);
-        const mugMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
-
-        function spawnThrownObject(pos, vel, sendNetwork = true) {
-            const obj = new THREE.Mesh(mugGeo, mugMat);
-            obj.position.copy(pos);
-            obj.userData = { velocity: vel, life: 3.0 };
-            scene.add(obj);
-            thrownObjects.push(obj);
-
-            if (sendNetwork && conn && conn.open) {
-                conn.send({
-                    type: 'object_throw',
-                    pos: { x: pos.x, y: pos.y, z: pos.z },
-                    vel: { x: vel.x, y: vel.y, z: vel.z }
-                });
+            // Set Raycaster origin & direction
+            if (sourceObject.isCamera) {
+                raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+            } else {
+                tempMatrix.identity().extractRotation(sourceObject.matrixWorld);
+                raycaster.ray.origin.setFromMatrixPosition(sourceObject.matrixWorld);
+                raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
             }
-        }
 
-        let scamCount = 0;
-        window.addEventListener('mousedown', () => {
-            if (!renderer.xr.isPresenting && controls.isLocked) {
-                const pos = new THREE.Vector3();
-                const dir = new THREE.Vector3();
-                camera.getWorldPosition(pos);
-                camera.getWorldDirection(dir);
+            const intersects = raycaster.intersectObjects(scene.children, true);
 
-                spawnThrownObject(pos, dir.multiplyScalar(15), true);
-                scamCount++;
-                document.getElementById('score').innerText = scamCount;
-            }
-        });
+            if (intersects.length > 0) {
+                const hitMesh = intersects[0].object;
 
-        // --- 7. VR KONTROLLEREK ÉS MOZGÁS ---
-        function onSelectStart(event) {
-            const controller = event.target;
-            const pos = new THREE.Vector3();
-            const dir = new THREE.Vector3();
-            controller.getWorldPosition(pos);
-            controller.getWorldDirection(dir);
-            dir.negate();
+                // 1. Handle Start / Restart from HUD Click
+                if (hitMesh === HUDMesh) {
+                    if (gameState === 'IDLE' || gameState === 'GAMEOVER') {
+                        startGame();
+                    }
+                    return;
+                }
 
-            spawnThrownObject(pos, dir.multiplyScalar(15).add(new THREE.Vector3(0, 3, 0)), true);
-            scamCount++;
-            document.getElementById('score').innerText = scamCount;
-        }
+                // 2. Handle Coffee Mug Stress Relief
+                if (hitMesh === coffeeMugMesh || hitMesh.name === 'coffee_mug') {
+                    if (gameState === 'PLAYING') {
+                        stressLevel = Math.max(0, stressLevel - 25);
+                        audio.playCoffee();
+                        spawnSparks(coffeeMugMesh.position, NEON_PINK, 12);
+                        updateHUD();
+                    }
+                    return;
+                }
 
-        const controller1 = renderer.xr.getController(0);
-        controller1.addEventListener('selectstart', onSelectStart);
-        cameraRig.add(controller1);
+                // 3. Handle Call Solution Buttons
+                if (hitMesh.name === 'solution_btn' && gameState === 'PLAYING') {
+                    const chosenSolution = hitMesh.userData.solution;
+                    const callGroup = hitMesh.userData.parentCall;
 
-        const controller2 = renderer.xr.getController(1);
-        controller2.addEventListener('selectstart', onSelectStart);
-        cameraRig.add(controller2);
+                    // Find corresponding call in active array
+                    const callIdx = activeCalls.findIndex(c => c.meshGroup === callGroup);
+                    if (callIdx !== -1) {
+                        const call = activeCalls[callIdx];
 
-        function updateDesktopMovement(delta) {
-            if (renderer.xr.isPresenting) return;
-            const speed = 4.0 * delta;
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            dir.y = 0;
-            dir.normalize();
+                        if (chosenSolution === call.type.solution) {
+                            // CORRECT SOLUTION!
+                            score += call.type.points * combo;
+                            combo++;
+                            answeredCount++;
+                            stressLevel = Math.max(0, stressLevel - 8);
+                            satisfaction = Math.min(100, satisfaction + 5);
 
-            const sideDir = new THREE.Vector3(-dir.z, 0, dir.x);
+                            audio.playSuccess();
+                            spawnSparks(intersects[0].point, NEON_CYAN, 20);
 
-            if (keyboard['KeyW']) cameraRig.position.addScaledVector(dir, speed);
-            if (keyboard['KeyS']) cameraRig.position.addScaledVector(dir, -speed);
-            if (keyboard['KeyA']) cameraRig.position.addScaledVector(sideDir, speed);
-            if (keyboard['KeyD']) cameraRig.position.addScaledVector(sideDir, -speed);
-        }
+                            if (combo % 5 === 0) {
+                                spawnConfetti();
+                            }
 
-        function updateVRLocomotion(delta) {
-            const session = renderer.xr.getSession();
-            if (!session) return;
+                        } else {
+                            // INCORRECT SOLUTION!
+                            combo = 1;
+                            stressLevel = Math.min(100, stressLevel + 15);
+                            satisfaction = Math.max(0, satisfaction - 12);
 
-            for (const inputSource of session.inputSources) {
-                if (inputSource && inputSource.handedness === 'left' && inputSource.gamepad) {
-                    const axes = inputSource.gamepad.axes;
-                    const xAxis = axes[2] || axes[0] || 0;
-                    const yAxis = axes[3] || axes[1] || 0;
+                            audio.playFail();
+                            spawnSparks(intersects[0].point, 0xff0055, 15);
+                        }
 
-                    if (Math.abs(xAxis) > 0.1 || Math.abs(yAxis) > 0.1) {
-                        const moveSpeed = 2.2 * delta;
-                        const headRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-                        headRotation.setFromQuaternion(camera.quaternion);
+                        // Remove solved call node
+                        scene.remove(call.meshGroup);
+                        activeCalls.splice(callIdx, 1);
 
-                        const moveVector = new THREE.Vector3(xAxis, 0, yAxis);
-                        moveVector.applyEuler(new THREE.Euler(0, headRotation.y, 0));
-                        moveVector.multiplyScalar(moveSpeed);
-
-                        cameraRig.position.add(moveVector);
+                        updateHUD();
                     }
                 }
             }
         }
 
-        // --- 8. MENÜ & VR GOMB ---
-        document.getElementById('solo-btn').addEventListener('click', startGame);
-        document.getElementById('host-btn').addEventListener('click', hostMultiGame);
-        document.getElementById('join-btn').addEventListener('click', joinMultiGame);
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            answeredCount = 0;
+            stressLevel = 10;
+            satisfaction = 100;
+            combo = 1;
+            spawnTimer = 0;
 
-        const vrButton = VRButton.createButton(renderer, {
-            requiredFeatures: ['hit-test'],
-            domOverlay: { root: document.getElementById('main-menu') }
-        });
-        document.body.appendChild(vrButton);
+            // Clear old calls
+            activeCalls.forEach(c => scene.remove(c.meshGroup));
+            activeCalls = [];
 
-        // --- 9. RENDER LOOP ---
+            // Hide desktop banner on start
+            document.getElementById('desktop-overlay').classList.add('opacity-0', 'pointer-events-none');
+
+            updateHUD();
+            spawnCallNode(); // Immediate first call
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            audio.playFail();
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('ccc_vr_highscore', highScore);
+            }
+
+            // Bring back desktop panel if not in VR
+            if (!renderer.xr.isPresenting) {
+                document.getElementById('desktop-overlay').classList.remove('opacity-0', 'pointer-events-none');
+            }
+
+            updateHUD();
+        }
+
+        // --- Particle FX Generators ---
+        function spawnSparks(pos, colorHex, count) {
+            const geo = new THREE.BufferGeometry();
+            const positions = [];
+            const velocities = [];
+
+            for (let i = 0; i < count; i++) {
+                positions.push(pos.x, pos.y, pos.z);
+                velocities.push(
+                    (Math.random() - 0.5) * 2.5,
+                    (Math.random() - 0.5) * 2.5,
+                    (Math.random() - 0.5) * 2.5
+                );
+            }
+
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({ color: colorHex, size: 0.04, transparent: true, opacity: 1 });
+            const pMesh = new THREE.Points(geo, mat);
+
+            scene.add(pMesh);
+            particles.push({ mesh: pMesh, vels: velocities, life: 1.0 });
+        }
+
+        function spawnConfetti() {
+            const pos = new THREE.Vector3(0, 2.2, -1.0);
+            spawnSparks(pos, NEON_YELLOW, 35);
+            spawnSparks(pos, NEON_PINK, 35);
+        }
+
+        // --- Main Game & Animation Loop ---
         const clock = new THREE.Clock();
 
-        renderer.setAnimationLoop(() => {
+        function animate() {
             const delta = clock.getDelta();
 
-            updateDesktopMovement(delta);
-            updateVRLocomotion(delta);
-            sendTransformData();
+            // 1. Desktop Fallback Keyboard Movement
+            if (!renderer.xr.isPresenting) {
+                const moveSpeed = 2.0 * delta;
+                if (moveKeys.KeyW) camera.position.z -= moveSpeed;
+                if (moveKeys.KeyS) camera.position.z += moveSpeed;
+                if (moveKeys.KeyA) camera.position.x -= moveSpeed;
+                if (moveKeys.KeyD) camera.position.x += moveSpeed;
 
-            for (let i = thrownObjects.length - 1; i >= 0; i--) {
-                const obj = thrownObjects[i];
-                obj.position.addScaledVector(obj.userData.velocity, delta);
-                obj.userData.velocity.y -= 9.8 * delta;
-                obj.userData.life -= delta;
+                // Keep player seated near desk limits
+                camera.position.x = Math.max(-1.0, Math.min(1.0, camera.position.x));
+                camera.position.z = Math.max(-0.2, Math.min(1.0, camera.position.z));
+            }
 
-                if (obj.position.y <= 0.05) {
-                    obj.position.y = 0.05;
-                    obj.userData.velocity.set(0, 0, 0);
+            // 2. Active Game Cycle Logic
+            if (gameState === 'PLAYING') {
+                // Spawner Timer
+                spawnTimer += delta;
+                if (spawnTimer >= nextSpawnInterval) {
+                    spawnTimer = 0;
+                    nextSpawnInterval = Math.max(1.2, 3.2 - (answeredCount * 0.08)); // Gradually speeds up
+                    spawnCallNode();
                 }
 
-                if (obj.userData.life <= 0) {
-                    scene.remove(obj);
-                    thrownObjects.splice(i, 1);
+                // Process Active Floating Call Terminals
+                for (let i = activeCalls.length - 1; i >= 0; i--) {
+                    const call = activeCalls[i];
+                    call.timeLeft -= delta;
+
+                    // Hover animation
+                    call.bobPhase += delta * 2;
+                    call.meshGroup.position.y += Math.sin(call.bobPhase) * 0.0008;
+
+                    // Timeout failure check
+                    if (call.timeLeft <= 0) {
+                        stressLevel = Math.min(100, stressLevel + 20);
+                        satisfaction = Math.max(0, satisfaction - 18);
+                        combo = 1;
+
+                        audio.playFail();
+                        spawnSparks(call.meshGroup.position, 0xff0000, 15);
+
+                        scene.remove(call.meshGroup);
+                        activeCalls.splice(i, 1);
+                        updateHUD();
+                    }
+                }
+
+                // Passive Stress Increments over time
+                stressLevel = Math.min(100, stressLevel + delta * 0.8);
+                if (Math.floor(clock.getElapsedTime() * 2) % 2 === 0) {
+                    updateHUD();
+                }
+
+                // Check Failure Conditions
+                if (stressLevel >= 100 || satisfaction <= 0) {
+                    gameOver();
+                }
+            }
+
+            // 3. Animate Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= delta * 2.5;
+
+                const posAttr = p.mesh.geometry.attributes.position;
+                for (let j = 0; j < posAttr.count; j++) {
+                    posAttr.setXYZ(
+                        j,
+                        posAttr.getX(j) + p.vels[j * 3] * delta,
+                        posAttr.getY(j) + p.vels[j * 3 + 1] * delta,
+                        posAttr.getZ(j) + p.vels[j * 3 + 2] * delta
+                    );
+                }
+                posAttr.needsUpdate = true;
+                p.mesh.material.opacity = p.life;
+
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
                 }
             }
 
             renderer.render(scene, camera);
-        });
+        }
 
-        window.addEventListener('resize', () => {
+        function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        }
     </script>
 </body>
 </html>
