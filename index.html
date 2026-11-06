@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hogwarts WebXR Experience</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; }
-        #info {
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #overlay {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 20px;
+            left: 20px;
             color: white;
-            font-family: sans-serif;
-            z-index: 100;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
         }
+        h1 { margin: 0 0 10px 0; font-size: 18px; color: #f0c040; }
+        p { margin: 5px 0; font-size: 14px; color: #ccc; }
     </style>
     <script type="importmap">
       {
@@ -25,7 +30,218 @@
     </script>
 </head>
 <body>
-    <div id="info">Grip: Pálca felvétele az övről | Trigger: Varázslás</div>
-    <script type="module" src="script.js"></script>
+    <div id="overlay">
+        <h1>⚡ Roxfort WebXR VR</h1>
+        <p>• <b>Grip gomb (Markolat):</b> Nyúlj a csípődhöz és vedd fel / rakd el a pálcát</p>
+        <p>• <b>Trigger gomb (Mutatóujj):</b> Varázslás (Stupefy)</p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+        let camera, scene, renderer;
+        let controller1, controller2;
+        let controllerGrip1, controllerGrip2;
+
+        let wandGroup, wandTipMesh;
+        let isWandInHand = false;
+        let activeController = null;
+
+        const beltHolster = new THREE.Group();
+
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.04);
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.6, 0);
+
+            // Fények
+            const ambient = new THREE.AmbientLight(0x404060, 2);
+            scene.add(ambient);
+
+            const moon = new THREE.DirectionalLight(0x88aaff, 2.5);
+            moon.position.set(5, 12, 5);
+            scene.add(moon);
+
+            // Roxfort Terem / Pince Környezet
+            createHogwartsHall();
+
+            // Renderer & WebXR setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            document.body.appendChild(VRButton.createButton(renderer));
+
+            // VR Kontrollerek (Ray & Grip)
+            controller1 = renderer.xr.getController(0);
+            controller1.addEventListener('selectstart', onTriggerDown);
+            controller1.addEventListener('squeezestart', () => onGripDown(controller1));
+            scene.add(controller1);
+
+            controller2 = renderer.xr.getController(1);
+            controller2.addEventListener('selectstart', onTriggerDown);
+            controller2.addEventListener('squeezestart', () => onGripDown(controller2));
+            scene.add(controller2);
+
+            // Látható Kezek (3D Kézfejek)
+            createHandModel(controller1, 0xd2b48c);
+            createHandModel(controller2, 0xd2b48c);
+
+            // PÁLCA ÉPÍTÉSE
+            wandGroup = new THREE.Group();
+            
+            // Pálca teste (fa)
+            const wandGeo = new THREE.CylinderGeometry(0.005, 0.01, 0.35, 16);
+            wandGeo.rotateX(Math.PI / 2);
+            wandGeo.translate(0, 0, -0.175); // Előre nyúlik a kézből
+            const wandMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.6 });
+            const wandMesh = new THREE.Mesh(wandGeo, wandMat);
+            wandGroup.add(wandMesh);
+
+            // Varázsfény / Lumos a Pálca Hegyen (-0.35m Z irányban)
+            const tipGeo = new THREE.SphereGeometry(0.012, 16, 16);
+            const tipMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            wandTipMesh = new THREE.Mesh(tipGeo, tipMat);
+            wandTipMesh.position.set(0, 0, -0.35);
+            wandGroup.add(wandTipMesh);
+
+            // ÖV / HOLSTER DEREKNÁL
+            scene.add(beltHolster);
+            const holsterGeo = new THREE.CylinderGeometry(0.02, 0.015, 0.2, 12);
+            const holsterMat = new THREE.MeshStandardMaterial({ color: 0x221100 });
+            const holsterMesh = new THREE.Mesh(holsterGeo, holsterMat);
+            holsterMesh.rotation.z = Math.PI / 5;
+            beltHolster.add(holsterMesh);
+
+            // Alapértelmezetten a pálca az övön van
+            attachWandToHolster();
+
+            window.addEventListener('resize', onWindowResize);
+            renderer.setAnimationLoop(render);
+        }
+
+        function createHandModel(controller, color) {
+            const handMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 16, 16),
+                new THREE.MeshStandardMaterial({ color: color, roughness: 0.7 })
+            );
+            handMesh.scale.set(1, 0.6, 1.4);
+            controller.add(handMesh);
+        }
+
+        function attachWandToHolster() {
+            isWandInHand = false;
+            activeController = null;
+            beltHolster.add(wandGroup);
+            wandGroup.position.set(0, 0, 0);
+            wandGroup.rotation.set(Math.PI / 4, 0, 0);
+        }
+
+        function onGripDown(controller) {
+            const handPos = new THREE.Vector3();
+            controller.getWorldPosition(handPos);
+
+            const holsterPos = new THREE.Vector3();
+            beltHolster.getWorldPosition(holsterPos);
+
+            if (!isWandInHand) {
+                // Ha közel nyúlsz a csípődhöz (< 40cm), felveszed
+                if (handPos.distanceTo(holsterPos) < 0.4) {
+                    isWandInHand = true;
+                    activeController = controller;
+                    controller.add(wandGroup);
+                    wandGroup.position.set(0, 0, 0);
+                    wandGroup.rotation.set(0, 0, 0);
+                }
+            } else if (activeController === controller) {
+                // Ha visszanyúlsz a csípődhöz, visszateszed
+                if (handPos.distanceTo(holsterPos) < 0.4) {
+                    attachWandToHolster();
+                }
+            }
+        }
+
+        function onTriggerDown(event) {
+            const controller = event.target;
+            if (!isWandInHand || activeController !== controller) return;
+
+            // VARÁZSLAT KILÖVÉSE
+            const tipWorldPos = new THREE.Vector3();
+            wandTipMesh.getWorldPosition(tipWorldPos);
+
+            const wandDirection = new THREE.Vector3();
+            wandGroup.getWorldDirection(wandDirection);
+            wandDirection.negate(); // Hátról előre mutató vektor korrekció
+
+            // Varázsgömb
+            const spellGeo = new THREE.SphereGeometry(0.035, 16, 16);
+            const spellMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+            const spell = new THREE.Mesh(spellGeo, spellMat);
+
+            const spellLight = new THREE.PointLight(0xff0044, 5, 4);
+            spell.add(spellLight);
+
+            spell.position.copy(tipWorldPos);
+            scene.add(spell);
+
+            const speed = 0.4;
+            const interval = setInterval(() => {
+                spell.position.addScaledVector(wandDirection, speed);
+                if (spell.position.distanceTo(tipWorldPos) > 30) {
+                    scene.remove(spell);
+                    spell.geometry.dispose();
+                    spell.material.dispose();
+                    clearInterval(interval);
+                }
+            }, 16);
+        }
+
+        function createHogwartsHall() {
+            // Padló
+            const floorGeo = new THREE.PlaneGeometry(40, 40);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x151518, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            scene.add(floor);
+
+            // Roxforti Oszlopok
+            const pillarGeo = new THREE.CylinderGeometry(0.5, 0.6, 10, 16);
+            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x252530 });
+
+            for (let x of [-6, 6]) {
+                for (let z of [-12, -6, 0, 6, 12]) {
+                    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                    pillar.position.set(x, 5, z);
+                    scene.add(pillar);
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function render() {
+            if (renderer.xr.isPresenting) {
+                const xrCamera = renderer.xr.getCamera();
+                const headPos = new THREE.Vector3();
+                xrCamera.getWorldPosition(headPos);
+
+                // Az öv mindig a fej alatt 55 cm-re helyezkedik el
+                beltHolster.position.set(headPos.x + 0.2, headPos.y - 0.55, headPos.z);
+            }
+            renderer.render(scene, camera);
+        }
+    </script>
 </body>
 </html>
