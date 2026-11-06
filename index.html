@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hogwarts Great Hall WebXR</title>
+    <title>Hogwarts Great Hall - Ultimate VR</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #overlay {
@@ -15,7 +15,7 @@
             background: rgba(0,0,0,0.85);
             padding: 15px;
             border-radius: 8px;
-            border: 1px solid #d4af37;
+            border: 2px solid #d4af37;
         }
         h1 { margin: 0 0 10px 0; font-size: 18px; color: #f0c040; }
         p { margin: 5px 0; font-size: 14px; color: #ddd; }
@@ -31,9 +31,9 @@
 </head>
 <body>
     <div id="overlay">
-        <h1>⚡ Roxfort Nagy Terem - WebXR</h1>
-        <p>• <b>Grip (Markolat):</b> Nyúlj a jobb csípődhöz az övhöz, és vedd fel a pálcát.</p>
-        <p>• <b>Trigger (Mutatóujj):</b> Varázslás (Stupefy lövés a pálca hegyéből).</p>
+        <h1>⚡ Roxfort Nagy Terem (V.2)</h1>
+        <p>• <b>Grip:</b> Pálca felvétele a jobb csípőmről</p>
+        <p>• <b>Trigger:</b> Varázslat indítása a pálca hegyéből</p>
     </div>
 
     <script type="module">
@@ -46,12 +46,10 @@
         let isWandInHand = false;
         let activeController = null;
 
-        // Test és Öv
         const playerBody = new THREE.Group();
         const beltHolster = new THREE.Group();
         const floatingCandles = [];
 
-        // Vektorok a pozicionáláshoz
         const headPos = new THREE.Vector3();
         const headDir = new THREE.Vector3();
 
@@ -59,22 +57,27 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x020208);
-            scene.fog = new THREE.FogExp2(0x020208, 0.025);
+            // Varázslatos éjszakai égbolt szín
+            scene.background = new THREE.Color(0x01010a);
 
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 1.6, 8);
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 150);
+            camera.position.set(0, 1.6, 10);
 
-            // Ambient és holdfény az ablakok felől
-            const ambient = new THREE.AmbientLight(0x334466, 1.2);
+            // Fények a Nagy Teremhez
+            const ambient = new THREE.AmbientLight(0x223355, 1.5);
             scene.add(ambient);
 
-            const windowLight = new THREE.DirectionalLight(0x6688cc, 2);
-            windowLight.position.set(-15, 12, 0);
-            scene.add(windowLight);
+            // Meleg kandallófény a falak felől
+            const fireLight1 = new THREE.PointLight(0xff7722, 2, 25);
+            fireLight1.position.set(-6, 3, 0);
+            scene.add(fireLight1);
 
-            // ROXFORT NAGY TEREM PÁLYA ÉPÍTÉSE
-            createHogwartsGreatHall();
+            const fireLight2 = new THREE.PointLight(0xff7722, 2, 25);
+            fireLight2.position.set(6, 3, 0);
+            scene.add(fireLight2);
+
+            // ÚJ, RÉSZLETES NAGY TEREM PÁLYA BETÖLTÉSE
+            createDetailedGreatHall();
 
             // Renderer & WebXR
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -84,7 +87,7 @@
             document.body.appendChild(renderer.domElement);
             document.body.appendChild(VRButton.createButton(renderer));
 
-            // Test és Öv bekötése
+            // Test és Öv
             scene.add(playerBody);
             scene.add(beltHolster);
             createPlayerAvatar();
@@ -100,11 +103,10 @@
             controller2.addEventListener('squeezestart', () => onGripDown(controller2));
             scene.add(controller2);
 
-            // Kézfejek
             createHandVisual(controller1);
             createHandVisual(controller2);
 
-            // PÁLCA ÉPÍTÉSE
+            // Pálca
             wandGroup = new THREE.Group();
             const wandGeo = new THREE.CylinderGeometry(0.004, 0.008, 0.35, 16);
             wandGeo.rotateX(Math.PI / 2);
@@ -113,7 +115,6 @@
             const wandMesh = new THREE.Mesh(wandGeo, wandMat);
             wandGroup.add(wandMesh);
 
-            // Lumos / Pálca hegye
             const tipGeo = new THREE.SphereGeometry(0.012, 16, 16);
             const tipMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
             wandTipMesh = new THREE.Mesh(tipGeo, tipMat);
@@ -127,23 +128,18 @@
             holsterMesh.rotation.z = Math.PI / 6;
             beltHolster.add(holsterMesh);
 
-            // Alapból az övön van a pálca
             attachWandToHolster();
 
             window.addEventListener('resize', onWindowResize);
             renderer.setAnimationLoop(render);
         }
 
-        // KARAKTER TEST (KORRIGÁLT POZÍCIÓVAL)
         function createPlayerAvatar() {
             const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.9 });
-
-            // Törzs - kicsit lejjebb és háttrébb, hogy ne takarja a látóteret
             const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.55, 16), bodyMat);
             torso.position.set(0, -0.45, -0.05);
             playerBody.add(torso);
 
-            // Vállak
             const leftShoulder = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), bodyMat);
             leftShoulder.position.set(-0.20, -0.22, -0.05);
             playerBody.add(leftShoulder);
@@ -162,94 +158,81 @@
             controller.add(handMesh);
         }
 
-        // PÁLYA: ROXFORT NAGY TEREM GENERÁLÁSA
-        function createHogwartsGreatHall() {
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x22222a, roughness: 0.8 });
-            const woodMat = new THREE.MeshStandardMaterial({ color: 0x3a2212, roughness: 0.7 });
-            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x15151e, roughness: 0.9 });
+        // --- TELJESEN ÚJ, RÉSZLETES NAGY TEREM PÁLYA ---
+        function createDetailedGreatHall() {
+            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x1b1b22, roughness: 0.9 });
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x282835, roughness: 0.8 });
+            const woodDark = new THREE.MeshStandardMaterial({ color: 0x2b170b, roughness: 0.6 });
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xc9a050, metalness: 0.8, roughness: 0.2 });
 
-            // 1. Padló
-            const floorGeo = new THREE.PlaneGeometry(16, 30);
-            const floor = new THREE.Mesh(floorGeo, stoneMat);
+            // 1. Padló (Kőlapok)
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 36), stoneMat);
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
 
-            // 2. Falak
-            const backWall = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 0.5), wallMat);
-            backWall.position.set(0, 5, -15);
-            scene.add(backWall);
+            // 2. Emelvény a terem végén (Tanári asztalok helye)
+            const dais = new THREE.Mesh(new THREE.BoxGeometry(18, 0.2, 5), stoneMat);
+            dais.position.set(0, 0.1, -14);
+            scene.add(dais);
 
-            const frontWall = new THREE.Mesh(new THREE.BoxGeometry(16, 10, 0.5), wallMat);
-            frontWall.position.set(0, 5, 15);
-            scene.add(frontWall);
-
-            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 10, 30), wallMat);
-            leftWall.position.set(-8, 5, 0);
+            // 3. Impozáns falak és oszlopok
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 12, 36), wallMat);
+            leftWall.position.set(-10, 6, 0);
             scene.add(leftWall);
 
-            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.5, 10, 30), wallMat);
-            rightWall.position.set(8, 5, 0);
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.6, 12, 36), wallMat);
+            rightWall.position.set(10, 6, 0);
             scene.add(rightWall);
 
-            // 3. Gótikus Oszlopok a falak mentén
-            const pillarGeo = new THREE.CylinderGeometry(0.4, 0.5, 10, 16);
-            for (let z = -12; z <= 12; z += 6) {
-                const pLeft = new THREE.Mesh(pillarGeo, wallMat);
-                pLeft.position.set(-7.5, 5, z);
-                scene.add(pLeft);
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(20, 12, 0.6), wallMat);
+            backWall.position.set(0, 6, -18);
+            scene.add(backWall);
 
-                const pRight = new THREE.Mesh(pillarGeo, wallMat);
-                pRight.position.set(7.5, 5, z);
-                scene.add(pRight);
-            }
+            // 4. Házak Hosszú Asztalai (Sötétfa + Arany díszítés)
+            const tableGeo = new THREE.BoxGeometry(1.6, 0.75, 22);
+            const benchGeo = new THREE.BoxGeometry(0.4, 0.45, 22);
 
-            // 4. Házak Asztalai (4 Hosszú Asztal Padokkal)
-            const tableGeo = new THREE.BoxGeometry(1.8, 0.7, 18);
-            const benchGeo = new THREE.BoxGeometry(0.5, 0.4, 18);
-
-            const tablePositions = [-4.5, -1.8, 1.8, 4.5];
-            tablePositions.forEach((x) => {
-                const table = new THREE.Mesh(tableGeo, woodMat);
-                table.position.set(x, 0.35, 0);
+            [-5, -1.7, 1.7, 5].forEach(x => {
+                const table = new THREE.Mesh(tableGeo, woodDark);
+                table.position.set(x, 0.375, 2);
                 scene.add(table);
 
-                const benchLeft = new THREE.Mesh(benchGeo, woodMat);
-                benchLeft.position.set(x - 0.7, 0.2, 0);
-                scene.add(benchLeft);
+                const benchL = new THREE.Mesh(benchGeo, woodDark);
+                benchL.position.set(x - 0.7, 0.22, 2);
+                scene.add(benchL);
 
-                const benchRight = new THREE.Mesh(benchGeo, woodMat);
-                benchRight.position.set(x + 0.7, 0.2, 0);
-                scene.add(benchRight);
+                const benchR = new THREE.Mesh(benchGeo, woodDark);
+                benchR.position.set(x + 0.7, 0.22, 2);
+                scene.add(benchR);
             });
 
-            // 5. Tanári Katedra Asztal a terem elején
-            const teacherTable = new THREE.Mesh(new THREE.BoxGeometry(12, 0.8, 1.5), woodMat);
-            teacherTable.position.set(0, 0.4, -12);
+            // 5. Tanári Főasztal az emelvényen
+            const teacherTable = new THREE.Mesh(new THREE.BoxGeometry(14, 0.85, 1.8), goldMat);
+            teacherTable.position.set(0, 0.525, -14);
             scene.add(teacherTable);
 
-            // 6. Lebegő Gyertyák meleg fénnyel
-            const candleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8);
-            const candleMat = new THREE.MeshBasicMaterial({ color: 0xfff5cc });
+            // 6. Lebegő Gyertyák a plafon alatt (Varázslatos mennyezet illúzió)
+            const candleGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.3, 8);
+            const candleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-            for (let i = 0; i < 40; i++) {
-                const candleGroup = new THREE.Group();
+            for (let i = 0; i < 50; i++) {
+                const group = new THREE.Group();
                 const candle = new THREE.Mesh(candleGeo, candleMat);
-                candleGroup.add(candle);
+                group.add(candle);
 
-                const flame = new THREE.PointLight(0xffaa33, 1.5, 4);
-                flame.position.set(0, 0.15, 0);
-                candleGroup.add(flame);
+                const flame = new THREE.PointLight(0xffaa22, 1.2, 5);
+                flame.position.set(0, 0.2, 0);
+                group.add(flame);
 
-                const rx = (Math.random() - 0.5) * 12;
-                const ry = 4 + Math.random() * 2.5;
-                const rz = (Math.random() - 0.5) * 22;
+                const rx = (Math.random() - 0.5) * 16;
+                const ry = 5 + Math.random() * 3;
+                const rz = (Math.random() - 0.5) * 30;
 
-                candleGroup.position.set(rx, ry, rz);
-                scene.add(candleGroup);
+                group.position.set(rx, ry, rz);
+                scene.add(group);
 
-                // Animációhoz elmentjük az alap Y pozíciót és egy egyedi eltolást
                 floatingCandles.push({
-                    group: candleGroup,
+                    group: group,
                     baseY: ry,
                     offset: Math.random() * Math.PI * 2
                 });
@@ -298,10 +281,10 @@
             wandDirection.negate();
 
             const spellGeo = new THREE.SphereGeometry(0.035, 16, 16);
-            const spellMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+            const spellMat = new THREE.MeshBasicMaterial({ color: 0xff1133 });
             const spell = new THREE.Mesh(spellGeo, spellMat);
 
-            const spellLight = new THREE.PointLight(0xff0044, 4, 4);
+            const spellLight = new THREE.PointLight(0xff1133, 5, 4);
             spell.add(spellLight);
 
             spell.position.copy(tipWorldPos);
@@ -310,7 +293,7 @@
             const speed = 0.5;
             const interval = setInterval(() => {
                 spell.position.addScaledVector(wandDirection, speed);
-                if (spell.position.distanceTo(tipWorldPos) > 30) {
+                if (spell.position.distanceTo(tipWorldPos) > 35) {
                     scene.remove(spell);
                     spell.geometry.dispose();
                     spell.material.dispose();
@@ -326,10 +309,9 @@
         }
 
         function render(time) {
-            // Lebegő gyertyák lágy hullámzó animációja
             const t = time * 0.0015;
             floatingCandles.forEach(c => {
-                c.group.position.y = c.baseY + Math.sin(t + c.offset) * 0.12;
+                c.group.position.y = c.baseY + Math.sin(t + c.offset) * 0.15;
             });
 
             if (renderer.xr.isPresenting) {
@@ -339,11 +321,9 @@
 
                 const yaw = Math.atan2(headDir.x, headDir.z) + Math.PI;
 
-                // Törzs követése a fej alatt
                 playerBody.position.set(headPos.x, headPos.y, headPos.z);
                 playerBody.rotation.y = yaw;
 
-                // Öv pozíciója a csípőnél
                 const sideOffset = new THREE.Vector3(0.22, -0.55, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
                 beltHolster.position.copy(headPos).add(sideOffset);
                 beltHolster.rotation.y = yaw;
