@@ -20,7 +20,6 @@
         h1 { margin: 0 0 10px 0; font-size: 18px; color: #f0c040; }
         p { margin: 5px 0; font-size: 14px; color: #ddd; }
     </style>
-    <!-- Three.js importálás CDN-ről -->
     <script type="importmap">
       {
         "imports": {
@@ -33,9 +32,9 @@
 <body>
     <div id="overlay">
         <h1>⚡ Roxfort WebXR - Test & Pálca</h1>
-        <p>• <b>Test:</b> Látod a saját törzsedet, vállaidat és kezeidet VR-ban.</p>
+        <p>• <b>Test:</b> Ha lefelé nézel, látod a törzsedet és a vállaidat.</p>
         <p>• <b>Grip (Markolat):</b> Nyúlj a jobb csípődhöz az övhöz, és vedd fel a pálcát.</p>
-        <p>• <b>Trigger (Mutatóujj):</b> Varázslás (Lövés a pálca hegyéből).</p>
+        <p>• <b>Trigger (Mutatóujj):</b> Varázslás (Stupefy lövés a pálca hegyéből).</p>
     </div>
 
     <script type="module">
@@ -48,10 +47,14 @@
         let isWandInHand = false;
         let activeController = null;
 
-        // Test és öv referenciák
+        // Test és Öv
         const playerBody = new THREE.Group();
-        let torsoMesh, leftShoulderMesh, rightShoulderMesh;
         const beltHolster = new THREE.Group();
+
+        // Ideiglenes vektorok a kiszámításhoz
+        const headPos = new THREE.Vector3();
+        const headDir = new THREE.Vector3();
+        const headEuler = new THREE.Euler();
 
         init();
 
@@ -64,17 +67,17 @@
             camera.position.set(0, 1.6, 0);
 
             // Fények
-            const ambient = new THREE.AmbientLight(0x303050, 2);
+            const ambient = new THREE.AmbientLight(0x404060, 2);
             scene.add(ambient);
 
-            const moon = new THREE.DirectionalLight(0x7799ff, 2);
+            const moon = new THREE.DirectionalLight(0x7799ff, 2.5);
             moon.position.set(5, 15, 5);
             scene.add(moon);
 
-            // Roxfort Nagy Terem / Pince környezet
+            // Környezet
             createHogwartsEnvironment();
 
-            // Renderer & WebXR beállítás
+            // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -82,8 +85,9 @@
             document.body.appendChild(renderer.domElement);
             document.body.appendChild(VRButton.createButton(renderer));
 
-            // Játékos Teste (Törzs, vállak, kezek)
+            // Test és Öv hozzáadása a szcénához
             scene.add(playerBody);
+            scene.add(beltHolster);
             createPlayerAvatar();
 
             // VR Kontrollerek
@@ -97,64 +101,61 @@
             controller2.addEventListener('squeezestart', () => onGripDown(controller2));
             scene.add(controller2);
 
-            // Vizuális kézfejek a kontrollereken
+            // Kezek vizualizációja
             createHandVisual(controller1);
             createHandVisual(controller2);
 
             // Pálca felépítése
             wandGroup = new THREE.Group();
-            const wandGeo = new THREE.CylinderGeometry(0.004, 0.008, 0.35, 16);
+            const wandGeo = new THREE.CylinderGeometry(0.005, 0.01, 0.35, 16);
             wandGeo.rotateX(Math.PI / 2);
             wandGeo.translate(0, 0, -0.175);
             const wandMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.5 });
             const wandMesh = new THREE.Mesh(wandGeo, wandMat);
             wandGroup.add(wandMesh);
 
-            // Lumos / Pálca hegye
+            // Pálca hegye (Lumos)
             const tipGeo = new THREE.SphereGeometry(0.012, 16, 16);
             const tipMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
             wandTipMesh = new THREE.Mesh(tipGeo, tipMat);
             wandTipMesh.position.set(0, 0, -0.35);
             wandGroup.add(wandTipMesh);
 
-            // Öv / Pálcatartó a derekon
-            scene.add(beltHolster);
+            // Öv hüvely a csípőn
             const holsterGeo = new THREE.CylinderGeometry(0.02, 0.015, 0.18, 12);
             const holsterMat = new THREE.MeshStandardMaterial({ color: 0x1a0d00 });
             const holsterMesh = new THREE.Mesh(holsterGeo, holsterMat);
             holsterMesh.rotation.z = Math.PI / 6;
             beltHolster.add(holsterMesh);
 
-            // Kezdetben az övön van a pálca
+            // Alapból az övön van a pálca
             attachWandToHolster();
 
             window.addEventListener('resize', onWindowResize);
             renderer.setAnimationLoop(render);
         }
 
-        // Karakter testalkat (törzs és vállak, hogy lásd magad)
         function createPlayerAvatar() {
-            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 }); // Roxforti fekete/sötétkék köpeny
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.8 });
 
-            // Törzs (mellkas)
-            torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.55, 16), bodyMat);
-            playerBody.add(torsoMesh);
+            // Törzs (Roxforti köpeny)
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.6, 16), bodyMat);
+            torso.position.y = -0.3;
+            playerBody.add(torso);
 
             // Vállak
-            const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x22223b, roughness: 0.8 });
-            leftShoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), shoulderMat);
-            rightShoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), shoulderMat);
-            
-            leftShoulderMesh.position.set(-0.22, 0.22, 0);
-            rightShoulderMesh.position.set(0.22, 0.22, 0);
-            
-            playerBody.add(leftShoulderMesh);
-            playerBody.add(rightShoulderMesh);
+            const leftShoulder = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), bodyMat);
+            leftShoulder.position.set(-0.22, 0, 0);
+            playerBody.add(leftShoulder);
+
+            const rightShoulder = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), bodyMat);
+            rightShoulder.position.set(0.22, 0, 0);
+            playerBody.add(rightShoulder);
         }
 
         function createHandVisual(controller) {
             const handMesh = new THREE.Mesh(
-                new THREE.SphereGeometry(0.038, 16, 16),
+                new THREE.SphereGeometry(0.04, 16, 16),
                 new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 0.7 })
             );
             handMesh.scale.set(1, 0.6, 1.3);
@@ -177,8 +178,8 @@
             beltHolster.getWorldPosition(holsterPos);
 
             if (!isWandInHand) {
-                // Ha a jobb/bal kéz a csípőhöz közel nyúl (< 35cm), felveszi
-                if (handPos.distanceTo(holsterPos) < 0.35) {
+                // Ha közel nyúlsz a csípődhöz (< 40 cm), felveszi
+                if (handPos.distanceTo(holsterPos) < 0.4) {
                     isWandInHand = true;
                     activeController = controller;
                     controller.add(wandGroup);
@@ -186,8 +187,8 @@
                     wandGroup.rotation.set(0, 0, 0);
                 }
             } else if (activeController === controller) {
-                // Ha visszanyúlsz a csípőhöz, elteszed
-                if (handPos.distanceTo(holsterPos) < 0.35) {
+                // Ha visszanyúlsz, elteszi
+                if (handPos.distanceTo(holsterPos) < 0.4) {
                     attachWandToHolster();
                 }
             }
@@ -197,7 +198,7 @@
             const controller = event.target;
             if (!isWandInHand || activeController !== controller) return;
 
-            // Varázslat lövése pontosan a pálca hegyéből
+            // Lövés a pálca hegyéből
             const tipWorldPos = new THREE.Vector3();
             wandTipMesh.getWorldPosition(tipWorldPos);
 
@@ -206,10 +207,10 @@
             wandDirection.negate();
 
             const spellGeo = new THREE.SphereGeometry(0.035, 16, 16);
-            const spellMat = new THREE.MeshBasicMaterial({ color: 0xff1133 });
+            const spellMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
             const spell = new THREE.Mesh(spellGeo, spellMat);
 
-            const spellLight = new THREE.PointLight(0xff1133, 4, 4);
+            const spellLight = new THREE.PointLight(0xff0044, 4, 4);
             spell.add(spellLight);
 
             spell.position.copy(tipWorldPos);
@@ -228,14 +229,12 @@
         }
 
         function createHogwartsEnvironment() {
-            // Padló
             const floorGeo = new THREE.PlaneGeometry(35, 35);
             const floorMat = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.9 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
 
-            // Kőoszlopok
             const pillarGeo = new THREE.CylinderGeometry(0.45, 0.55, 9, 16);
             const pillarMat = new THREE.MeshStandardMaterial({ color: 0x22222d });
 
@@ -257,16 +256,20 @@
         function render() {
             if (renderer.xr.isPresenting) {
                 const xrCamera = renderer.xr.getCamera();
-                const headPos = new THREE.Vector3();
                 xrCamera.getWorldPosition(headPos);
+                xrCamera.getWorldDirection(headDir);
 
-                // A test pozícióját a headset alatt kötjük be (fej alatt lejjebb tolva)
-                playerBody.position.set(headPos.x, headPos.y - 0.45, headPos.z);
-                playerBody.rotation.y = xrCamera.rotation.y;
+                // Fej Y-tengely körüli elfordulása
+                const yaw = Math.atan2(headDir.x, headDir.z) + Math.PI;
 
-                // Az öv/holster fixen a jobb csípőnél helyezkedik el a testhez képest
-                beltHolster.position.set(headPos.x + 0.22, headPos.y - 0.55, headPos.z);
-                beltHolster.rotation.y = xrCamera.rotation.y;
+                // Törzs pozicionálása a fej alatt
+                playerBody.position.set(headPos.x, headPos.y - 0.2, headPos.z);
+                playerBody.rotation.y = yaw;
+
+                // Öv pozicionálása a jobb csípőnél
+                const sideOffset = new THREE.Vector3(0.2, -0.5, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                beltHolster.position.copy(headPos).add(sideOffset);
+                beltHolster.rotation.y = yaw;
             }
 
             renderer.render(scene, camera);
